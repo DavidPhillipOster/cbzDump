@@ -30,7 +30,6 @@ NSString *const OCRUnZipDomain = @"OCRUnZipDomain";
 
 @property (nonatomic, readwrite, copy) NSString *path;
 @property (nonatomic) unzFile unzip;
-@property (nonatomic, strong) NSCache *cache;
 
 @end
 
@@ -50,8 +49,6 @@ NSString *const OCRUnZipDomain = @"OCRUnZipDomain";
 			return nil;
 		}
 		self.path = path;
-		self.cache = [[NSCache alloc] init];
-		self.cache.countLimit = 20;
 	}
 	
 	return self;
@@ -119,10 +116,6 @@ NSString *const OCRUnZipDomain = @"OCRUnZipDomain";
   }
 
   path = [path ocr_stringByNormalizingPathForZip];
-  NSData *data = [self.cache objectForKey:path];
-  if (data) {
-    return data;
-  }
 
   const char *rawFilename = path.UTF8String;
   if(unzLocateFile(self.unzip, rawFilename, 0) != UNZ_OK) {
@@ -169,8 +162,6 @@ NSString *const OCRUnZipDomain = @"OCRUnZipDomain";
 
   unzCloseCurrentFile(self.unzip);
   free(buffer);
-
-  [self.cache setObject:mutableData forKey:path];
 
   return mutableData;
 }
