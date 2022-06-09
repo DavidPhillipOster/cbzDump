@@ -41,8 +41,9 @@
 			}
 		}
 		if (a.count) {
-			// Next line For debugging.
+#if DEBUG
 			[a insertObject:[NSString stringWithFormat:@"## Page %@ ##", filemame] atIndex:0];
+#endif
 			NSString *joined = [a componentsJoinedByString:@"\n"];
 			dispatch_async(dispatch_get_main_queue(), ^{
 				self.pageToPageText[filemame] = joined;
@@ -61,32 +62,39 @@
 	if (unzip) {
 		self.ocrs = [NSMutableSet set];
 		NSArray *zipItems = unzip.items;
-		NSMutableArray *imageFiles = [NSMutableArray array];
 		self.pageToPageText = [NSMutableDictionary dictionary];
+		__weak typeof(self) weakSelf = self;
 		for (NSString *zipItem in zipItems) {
-			NSData *itemData = [unzip dataWithContentsOfFile:zipItem error:NULL];
-			if (20 < itemData.length) {
-				NSImage *image = [[NSImage alloc] initWithData:itemData];
-				if (image) {
-					OCRVision *ocrVision = [[OCRVision alloc] init];
-					[self.ocrs addObject:ocrVision];
-					__weak typeof(self) weakSelf = self;
+			@autoreleasepool {
+				OCRVision *ocrVision = [[OCRVision alloc] init];
+				[self.ocrs addObject:ocrVision];
+				// I don't trust unzip to be thread safe.
+				NSData *itemData = [unzip dataWithContentsOfFile:zipItem error:NULL];
+				if (20 < itemData.length) {
 					dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
-						NSString *zipItem1 = zipItem;
-						[ocrVision ocrImage:image completion:^(id<OCRVisionResults> ocrResults) {
-							[weakSelf ocr:ocrVision results:ocrResults filename:zipItem1];
-						}];
+						NSImage *image = [[NSImage alloc] initWithData:itemData];
+						if (image) {
+							[ocrVision ocrImage:image completion:^(id<OCRVisionResults> ocrResults) {
+								[weakSelf ocr:ocrVision results:ocrResults filename:zipItem];
+							}];
+						} else {
+							dispatch_async(dispatch_get_main_queue(), ^{
+								[self.ocrs removeObject:ocrVision];
+							});
+						}
 					});
-					[[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
-					[imageFiles addObject:zipItem];
+				} else {
+					[self.ocrs removeObject:ocrVision];
 				}
+				[[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
 			}
 		}
-
+		// Wait for all ocrs to complete.
 		while(self.ocrs.count != 0) {
 			[[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
 		}
 
+		// the files in the zip aren't necessarily in sorted order.
 		NSArray<NSString *> *sortedKeys = [self.pageToPageText.allKeys sortedArrayUsingSelector:@selector(compare:)];
 		NSMutableArray *orderedValues = [NSMutableArray array];
 		for (NSString *key in sortedKeys) {
