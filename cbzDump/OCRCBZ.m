@@ -41,7 +41,7 @@ static dispatch_queue_t serialQueue;
     textPieces = ocrResults.textObservations;
     NSMutableArray *a = [NSMutableArray array];
     for (VNRecognizedTextObservation *piece in textPieces) {
-      if (0.5 < piece.confidence) {
+      if (0.3 < piece.confidence) {
         VNRecognizedText *text1 = [[piece topCandidates:1] firstObject];
         NSString *s = text1.string;
         if (s.length) {
@@ -110,7 +110,7 @@ static dispatch_queue_t serialQueue;
     }
 
     // the files in the zip aren't necessarily in sorted order.
-    NSArray<NSString *> *sortedKeys = [self.pageToPageText.allKeys sortedArrayUsingSelector:@selector(compare:)];
+    NSArray<NSString *> *sortedKeys = [self.pageToPageText.allKeys sortedArrayUsingSelector:@selector(localizedStandardCompare:)];
     NSMutableArray *orderedValues = [NSMutableArray array];
     for (NSString *key in sortedKeys) {
       [orderedValues addObject:self.pageToPageText[key]];
